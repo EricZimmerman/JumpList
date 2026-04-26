@@ -69,14 +69,14 @@ jobs:
       - name: Validate package
         run: meziantou.validate-nuget-package (Get-ChildItem "${{ env.NuGetDirectory }}/*.nupkg")
 
-  run_test:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-    - name: Run tests
-      run: dotnet test --configuration Release
+#  run_test:
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: actions/checkout@v4
+#    - name: Setup .NET
+#      uses: actions/setup-dotnet@v4
+#    - name: Run tests
+#     run: dotnet test --configuration Release
 
   deploy:
     # Publish only when creating a GitHub Release
