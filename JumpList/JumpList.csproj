@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    
     <Authors>Eric Zimmerman</Authors>
     <Company>Eric Zimmerman</Company>
     <Product>Jumplist parser</Product>
@@ -10,10 +9,9 @@
     <Copyright>Eric Zimmerman</Copyright>
     <PackageProjectUrl>https://github.com/EricZimmerman/jumplist</PackageProjectUrl>
     <RepositoryUrl>https://github.com/EricZimmerman/jumplist</RepositoryUrl>
-    <Version>2026.5.0</Version>
+    <Version>2026.5.1</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <LangVersion>10</LangVersion>
-
     <PackageTags>jumplist, lnk, link</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
