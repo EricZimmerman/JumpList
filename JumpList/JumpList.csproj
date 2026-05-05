@@ -9,7 +9,7 @@
     <Copyright>Eric Zimmerman</Copyright>
     <PackageProjectUrl>https://github.com/EricZimmerman/jumplist</PackageProjectUrl>
     <RepositoryUrl>https://github.com/EricZimmerman/jumplist</RepositoryUrl>
-    <Version>2026.5.1</Version>
+    <Version>2026.5.2</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <LangVersion>10</LangVersion>
     <PackageTags>jumplist, lnk, link</PackageTags>
@@ -20,7 +20,9 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Lnk" Version="2026.5.0" />
+    <PackageReference Include="ExtensionBlocks" Version="2026.5.0" />
+    <PackageReference Include="GuidMapping" Version="2026.5.0" />
+    <PackageReference Include="Lnk" Version="2026.5.3" />
     <PackageReference Include="OleCf" Version="2026.5.0" />
 
     <None Include="../README.md" Pack="true" PackagePath=""/>

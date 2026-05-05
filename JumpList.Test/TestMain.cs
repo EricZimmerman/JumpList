@@ -116,13 +116,40 @@ public class TestMain
        // var f = @"C:\Users\eric\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\5a2098e080cf7ac4.automaticDestinations-ms";
       //  var f = @"C:\Users\eric\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\1c7a9be1b15a03ba.automaticDestinations-ms";
         //var f = @"C:\temp\(MUS2023)5a2098e080cf7ac4.automaticDestinations-ms";
-        var f = @"C:\Users\eric\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\1c7a9be1b15a03ba.automaticDestinations-ms";
+        var f = @"C:\Users\eric\AppData\Roaming\Microsoft\Windows\Recent\CustomDestinations";
 
+        var ft =
+            @"C:\Users\eric\AppData\Roaming\Microsoft\Windows\Recent\CustomDestinations\16f2f0042ddbe0e8.customDestinations-ms";
+        var aaaa1 = new CustomDestination(File.ReadAllBytes(ft), ft);
+        Console.WriteLine(aaaa1);
+        
+        
+        foreach (var file in Directory.GetFiles(f))
+        {
+            var raw = File.ReadAllBytes(file);
 
-        var raw = File.ReadAllBytes(f);
+            try
+            {
+                var aaaa = new CustomDestination(raw, file);
 
-        var aaaa = new AutomaticDestination(raw, f);
+                foreach (var aaaaEntry in aaaa.Entries)
+                {
+                    foreach (var aaaaEntryLnkFile in aaaaEntry.LnkFiles)
+                    {
+                        Console.WriteLine(aaaaEntryLnkFile);    
+                    }
+                }
+                
+                    
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                
+            }
+            
+        }
 
-        Console.WriteLine(aaaa);
+        
     }
 }
