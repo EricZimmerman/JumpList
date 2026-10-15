@@ -1,84 +1,119 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace JumpList.Automatic;
 
+/// <summary>
+///     The DestList stream of an automatic destinations jump list.
+/// </summary>
+/// <remarks>
+///     Version 1 (Windows 7/8) entries are 114 bytes plus the path. Version 2 and later (Windows 10/11) entries are
+///     130 bytes plus the path, followed by a 32-bit size and that many bytes of property store (0 when there is none).
+/// </remarks>
 public class DestList
 {
+    private const int V1PathSizeOffset = 112;
+    private const int V2PathSizeOffset = 128;
+
+    /// <exception cref="JumpListParseException">rawBytes is shorter than the 32 byte header</exception>
     public DestList(byte[] rawBytes)
     {
+        if (rawBytes == null)
+        {
+            throw new ArgumentNullException(nameof(rawBytes));
+        }
+
+        if (rawBytes.Length < DestListHeader.Size)
+        {
+            throw new JumpListParseException(
+                $"The DestList is {rawBytes.Length} bytes, smaller than its {DestListHeader.Size} byte header", 0,
+                "DestList header");
+        }
+
         Entries = new List<DestListEntry>();
 
-        var headerBytes = new byte[32];
-        Buffer.BlockCopy(rawBytes, 0, headerBytes, 0, 32);
+        var headerBytes = new byte[DestListHeader.Size];
+        Buffer.BlockCopy(rawBytes, 0, headerBytes, 0, DestListHeader.Size);
 
         Header = new DestListHeader(headerBytes);
 
-        var index = 32;
-        var pathSize = 0;
-        var entrySize = 0;
-
+        var index = DestListHeader.Size;
         var mruPos = 0;
 
-        if (Header.Version == 1)
+        var pathSizeOffset = Header.Version == 1 ? V1PathSizeOffset : V2PathSizeOffset;
+
+        // Version 1 stops at the header's entry count; later versions read to the end of the stream
+        while (index < rawBytes.Length && (Header.Version != 1 || Entries.Count < Header.NumberOfEntries))
         {
-            index = 32;
+            var remaining = rawBytes.Length - index;
 
-            while (index < rawBytes.Length && Entries.Count < Header.NumberOfEntries)
+            if (remaining < pathSizeOffset + 2)
             {
-                pathSize = BitConverter.ToInt16(rawBytes, index + 112);
-                //now that we know pathSize we can determine how big each record is
-                entrySize = 114 + pathSize * 2;
-
-                var entryBytes1 = new byte[entrySize];
-                Buffer.BlockCopy(rawBytes, index, entryBytes1, 0, entrySize);
-
-                var entry1 = new DestListEntry(entryBytes1, Header.Version, mruPos);
-
-                Entries.Add(entry1);
-
-                index += entrySize;
-
-                mruPos += 1;
+                ParseErrors.Add($"{remaining} trailing byte(s) at 0x{index:X} are too short for a DestList entry");
+                break;
             }
-        }
-    
-        else
-        {
-            //windows 10 has version 3              
 
-            index = 32;
+            var pathSize = BitConverter.ToInt16(rawBytes, index + pathSizeOffset);
+            //now that we know pathSize we can determine how big each record is
+            var entrySize = pathSizeOffset + 2 + pathSize * 2;
 
-            while (index < rawBytes.Length)
+            if (pathSize < 0 || entrySize > remaining)
             {
-                pathSize = BitConverter.ToInt16(rawBytes, index + 128);
-                //now that we know pathSize we can determine how big each record is
-                entrySize = 128 + 2 + pathSize * 2;
-                //128 is offset to the string, 2 for the size itself, double path for unicode
-                
-                //after entry size, if the 4 bytes are 0, theres no extra data, but if not, its an SPS
-                var spsSize = BitConverter.ToInt32(rawBytes,index + entrySize);
-
-                
-
-                var entryBytes2 = new byte[entrySize+spsSize+4];
-                Buffer.BlockCopy(rawBytes, index, entryBytes2, 0, entrySize+spsSize);
-
-                var entry2 = new DestListEntry(entryBytes2, Header.Version, mruPos,spsSize);
-
-                Entries.Add(entry2);
-
-                index += entrySize + spsSize + 4; //4 is the size of the sps
-
-                mruPos += 1;
+                ParseErrors.Add(
+                    $"DestList entry at 0x{index:X} has a path of {pathSize} characters, but only {remaining} bytes remain. Stopping");
+                break;
             }
+
+            var spsSize = 0;
+            var stride = entrySize;
+
+            if (Header.Version != 1)
+            {
+                //after the path, if the 4 bytes are 0, theres no extra data, but if not, its an SPS
+                if (remaining < entrySize + 4)
+                {
+                    ParseErrors.Add($"DestList entry at 0x{index:X} is missing its property store size. Stopping");
+                    break;
+                }
+
+                spsSize = BitConverter.ToInt32(rawBytes, index + entrySize);
+
+                if (spsSize < 0 || spsSize > remaining - entrySize - 4)
+                {
+                    ParseErrors.Add(
+                        $"DestList entry at 0x{index:X} has a property store of {spsSize} bytes, but only {remaining - entrySize - 4} remain. Stopping");
+                    break;
+                }
+
+                stride = entrySize + 4 + spsSize;
+            }
+
+            var entryBytes = new byte[stride];
+            Buffer.BlockCopy(rawBytes, index, entryBytes, 0, stride);
+
+            var entry = new DestListEntry(entryBytes, Header.Version, mruPos, spsSize);
+
+            foreach (var parseError in entry.ParseErrors)
+            {
+                ParseErrors.Add($"DestList entry {entry.EntryNumber} at 0x{index:X}: {parseError}");
+            }
+
+            Entries.Add(entry);
+
+            index += stride;
+            mruPos += 1;
         }
     }
 
     public DestListHeader Header { get; }
 
     public List<DestListEntry> Entries { get; }
+
+    /// <summary>
+    ///     Problems found while parsing, such as an entry that runs past the end of the stream.
+    /// </summary>
+    public List<string> ParseErrors { get; } = new List<string>();
 
     public override string ToString()
     {

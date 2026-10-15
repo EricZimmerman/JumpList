@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -11,18 +11,31 @@ namespace JumpList.Automatic;
 
 public class AutomaticDestination
 {
+    private readonly int _codepage;
     private readonly OleCfFile _oleContainer;
 
+    /// <summary>
+    ///     Parses an automatic destinations jump list. A damaged DestList, property store or LNK stream is reported in
+    ///     <see cref="ParseErrors" /> and the rest is still parsed.
+    /// </summary>
+    /// <exception cref="JumpListParseException">The data is empty</exception>
+    /// <exception cref="OleCfParseException">The data is not a usable OLE compound file</exception>
     public AutomaticDestination(byte[] rawBytes, string sourceFile, int codepage = 1252)
     {
+        if (rawBytes == null)
+        {
+            throw new ArgumentNullException(nameof(rawBytes));
+        }
+
         if (rawBytes.Length == 0)
         {
-            throw new Exception("Empty file");
+            throw new JumpListParseException("Empty file", 0, "File");
         }
 
         SourceFile = sourceFile;
+        _codepage = codepage;
 
-        var appid = Path.GetFileName(sourceFile).Split('.').FirstOrDefault();
+        var appid = Path.GetFileName(sourceFile ?? string.Empty).Split('.').FirstOrDefault();
         if (appid != null)
         {
             var aid = new AppIdInfo(appid);
@@ -36,74 +49,112 @@ public class AutomaticDestination
         _oleContainer = new OleCfFile(rawBytes, sourceFile);
 
         Directory = _oleContainer.Directory;
+        ParseErrors.AddRange(_oleContainer.ParseErrors.Select(t => $"OLE container: {t}"));
 
         var destList =
-            _oleContainer.Directory.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
+            _oleContainer.Directory.FirstOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
         if (destList != null && destList.DirectorySize > 0)
         {
-            var destBytes = _oleContainer.GetPayloadForDirectory(destList);
-
-            DestList = new DestList(destBytes);
-        }
-        
-        
-            
-        var destListPropertyStore =
-            _oleContainer.Directory.SingleOrDefault(t => t.DirectoryName == "DestListPropertyStore");
-        if (destListPropertyStore != null && destListPropertyStore.DirectorySize > 0)
-        {
-            var destListPropertyStoreBytes = _oleContainer.GetPayloadForDirectory(destListPropertyStore);
-
-            EmptyDestListPropertyStore = true;
-            
-            if (BitConverter.ToInt32(destListPropertyStoreBytes, 0) > 0)
+            try
             {
-                EmptyDestListPropertyStore = false;
-                DestListPropertyStore = new PropertySheet(destListPropertyStoreBytes.Skip(4).ToArray());    
+                var destBytes = _oleContainer.GetPayloadForDirectory(destList);
+
+                if (destBytes != null)
+                {
+                    DestList = new DestList(destBytes);
+                    ParseErrors.AddRange(DestList.ParseErrors.Select(t => $"DestList: {t}"));
+                }
+            }
+            catch (Exception ex) when (ex is OleCfParseException || ex is JumpListParseException)
+            {
+                ParseErrors.Add($"DestList: {ex.Message}");
             }
         }
 
+        var destListPropertyStore =
+            _oleContainer.Directory.FirstOrDefault(t => t.DirectoryName == "DestListPropertyStore");
+        if (destListPropertyStore != null && destListPropertyStore.DirectorySize > 0)
+        {
+            try
+            {
+                var destListPropertyStoreBytes = _oleContainer.GetPayloadForDirectory(destListPropertyStore);
+
+                EmptyDestListPropertyStore = true;
+
+                if (destListPropertyStoreBytes != null && destListPropertyStoreBytes.Length >= 4 &&
+                    BitConverter.ToInt32(destListPropertyStoreBytes, 0) > 0)
+                {
+                    EmptyDestListPropertyStore = false;
+                    DestListPropertyStore = new PropertySheet(destListPropertyStoreBytes.Skip(4).ToArray());
+                }
+            }
+            catch (Exception ex)
+            {
+                ParseErrors.Add($"DestListPropertyStore: {ex.Message}");
+            }
+        }
 
         DestListEntries = new List<AutoDestList>();
 
         if (DestList != null)
         {
             DestListCount = DestList.Header.NumberOfEntries;
+            PinnedDestListCount = DestList.Header.NumberOfPinnedEntries;
             DestListVersion = DestList.Header.Version;
             LastUsedEntryNumber = DestList.Header.LastEntryNumber;
 
             foreach (var entry in DestList.Entries)
             {
+                // The stream for an entry is named with its number in hex
                 var dirItem =
-                    _oleContainer.Directory.SingleOrDefault(
+                    _oleContainer.Directory.FirstOrDefault(
                         t =>
                             string.Equals(t.DirectoryName, entry.EntryNumber.ToString("X"),
                                 StringComparison.InvariantCultureIgnoreCase));
 
+                LnkFile dlnk = null;
+
                 if (dirItem != null)
                 {
-                    var sfn = $"{sourceFile}_Directory name_{dirItem.DirectoryName:X}";
-
-                    var p = _oleContainer.GetPayloadForDirectory(dirItem);
-
-                    var dlnk = new LnkFile(p, sfn, codepage);
-
-                    var dle = new AutoDestList(entry, dlnk,entry.InteractionCount);
-
-                    if (entry.Sps != null && HasSps == false)
-                    {
-                        HasSps = true;
-                    }
-
-                    DestListEntries.Add(dle);
+                    dlnk = ReadLnk(dirItem);
                 }
-                else
+
+                if (entry.Sps != null)
                 {
-                    var dleNull = new AutoDestList(entry, null,entry.InteractionCount);
-
-                    DestListEntries.Add(dleNull);
+                    HasSps = true;
                 }
+
+                DestListEntries.Add(new AutoDestList(entry, dlnk, entry.InteractionCount));
             }
+        }
+    }
+
+    /// <summary>
+    ///     Problems that didn't stop parsing: a damaged DestList, property store or LNK stream, or problems in the OLE
+    ///     container. An entry whose LNK couldn't be read has a null Lnk.
+    /// </summary>
+    public List<string> ParseErrors { get; } = new List<string>();
+
+    private LnkFile ReadLnk(DirectoryEntry dirItem)
+    {
+        var sfn = $"{SourceFile}_Directory name_{dirItem.DirectoryName:X}";
+
+        try
+        {
+            var p = _oleContainer.GetPayloadForDirectory(dirItem);
+
+            if (p == null || p.Length == 0)
+            {
+                ParseErrors.Add($"Stream {dirItem.DirectoryName} is empty");
+                return null;
+            }
+
+            return new LnkFile(p, sfn, _codepage);
+        }
+        catch (Exception ex)
+        {
+            ParseErrors.Add($"Stream {dirItem.DirectoryName}: unable to parse LNK: {ex.Message}");
+            return null;
         }
     }
 
@@ -128,10 +179,13 @@ public class AutomaticDestination
 
     public List<AutoDestList> DestListEntries { get; }
 
+    /// <summary>
+    ///     Parses the LNK in a stream, using the codepage the jump list was loaded with
+    /// </summary>
     public LnkFile GetLnkFromDirectoryName(string dirName)
     {
         var dirItem =
-            _oleContainer.Directory.SingleOrDefault(
+            _oleContainer.Directory.FirstOrDefault(
                 t =>
                     string.Equals(t.DirectoryName, dirName,
                         StringComparison.InvariantCultureIgnoreCase));
@@ -142,7 +196,7 @@ public class AutomaticDestination
 
             var p = _oleContainer.GetPayloadForDirectory(dirItem);
 
-            var dlnk = new LnkFile(p, sfn);
+            var dlnk = new LnkFile(p, sfn, _codepage);
 
             return dlnk;
         }
@@ -221,9 +275,22 @@ public class AutomaticDestination
                 continue;
             }
 
-            var lnkBytes = _oleContainer.GetPayloadForDirectory(directoryItem);
+            if (directoryItem.DirectoryType != DirectoryEntry.DirectoryEntryTypes.Stream)
+            {
+                continue;
+            }
 
-            if (lnkBytes[0] != 0x4c)
+            byte[] lnkBytes;
+            try
+            {
+                lnkBytes = _oleContainer.GetPayloadForDirectory(directoryItem);
+            }
+            catch (OleCfParseException)
+            {
+                continue;
+            }
+
+            if (lnkBytes == null || lnkBytes.Length == 0 || lnkBytes[0] != 0x4c)
             {
                 //this isn't a lnk file since it doesn't start with 0x4c, so continue
                 continue;

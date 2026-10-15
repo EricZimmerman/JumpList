@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -7,9 +7,8 @@
     <Product>Jumplist parser</Product>
     <Description>Parses Windows jumplists (automatic and custom destinations)</Description>
     <Copyright>Eric Zimmerman</Copyright>
-    <PackageProjectUrl>https://github.com/EricZimmerman/jumplist</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/EricZimmerman/jumplist</RepositoryUrl>
-    <Version>2026.5.2</Version>
+    <PackageProjectUrl>https://github.com/EricZimmerman/JumpList</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/EricZimmerman/JumpList</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <LangVersion>10</LangVersion>
     <PackageTags>jumplist, lnk, link</PackageTags>
@@ -20,20 +19,21 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ExtensionBlocks" Version="2026.5.0" />
-    <PackageReference Include="GuidMapping" Version="2026.5.0" />
-    <PackageReference Include="Lnk" Version="2026.5.3" />
-    <PackageReference Include="OleCf" Version="2026.5.0" />
+    <PackageReference Include="ExtensionBlocks" Version="2026.10.0" />
+    <PackageReference Include="GuidMapping" Version="2026.10.1" />
+    <PackageReference Include="Lnk" Version="2026.10.2" />
+    <PackageReference Include="OleCf" Version="2026.10.1" />
 
     <None Include="../README.md" Pack="true" PackagePath=""/>
     <None Include="../icon.png" Pack="true" PackagePath=""/>
-    <PackageReference Include="DotNet.ReproducibleBuilds" Version="2.0.2">
+    <InternalsVisibleTo Include="JumpList.Test" />
+    <PackageReference Include="DotNet.ReproducibleBuilds" Version="2.0.5">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="MinVer" Version="7.0.0">
+    <PackageReference Include="MinVer" Version="8.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
-</Project>  
+</Project>

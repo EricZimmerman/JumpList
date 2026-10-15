@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using JumpList.Automatic;
 using JumpList.Custom;
 
@@ -14,9 +14,9 @@ public static class JumpList
     public static AppIdList AppIdList { get; internal set; }
 
 
+    // AppIdList is not recreated here: that discarded AppIds added with AppIdList.LoadAppListFromFile
     public static AutomaticDestination LoadAutoJumplist(string autoName, int codepage = 1252)
     {
-        AppIdList = new AppIdList();
         var raw = File.ReadAllBytes(autoName);
 
         return new AutomaticDestination(raw, autoName, codepage);
@@ -24,7 +24,6 @@ public static class JumpList
 
     public static CustomDestination LoadCustomJumplist(string customName, int codepage = 1252)
     {
-        AppIdList = new AppIdList();
         var raw = File.ReadAllBytes(customName);
 
         return new CustomDestination(raw, customName, codepage);

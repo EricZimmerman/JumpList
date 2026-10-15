@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,20 +6,38 @@ using System.Text;
 
 namespace JumpList.Custom;
 
+/// <summary>
+///     A custom destinations jump list (*.customDestinations-ms).
+/// </summary>
+/// <remarks>
+///     A 12 byte header (format version, number of categories, unknown) and then categories, each ending with the
+///     footer 0xBABFFBAB. Each <see cref="Entry" /> is one category.
+/// </remarks>
 public class CustomDestination
 {
+    private const int FileHeaderSize = 12;
+
     private readonly byte[] footerBytes = {0xAB, 0xFB, 0xBF, 0xBA};
 
+    /// <summary>
+    ///     Parses a custom destinations jump list. A LNK that can't be parsed is reported in <see cref="ParseErrors" />.
+    /// </summary>
+    /// <exception cref="JumpListParseException">The data is empty, too small or has no footer</exception>
     public CustomDestination(byte[] rawBytes, string sourceFile, int codepage = 1252)
     {
+        if (rawBytes == null)
+        {
+            throw new ArgumentNullException(nameof(rawBytes));
+        }
+
         if (rawBytes.Length == 0)
         {
-            throw new Exception("Empty file");
+            throw new JumpListParseException("Empty file", 0, "File");
         }
 
         SourceFile = sourceFile;
 
-        var appid = Path.GetFileName(sourceFile).Split('.').FirstOrDefault();
+        var appid = Path.GetFileName(sourceFile ?? string.Empty).Split('.').FirstOrDefault();
         if (appid != null)
         {
             var aid = new AppIdInfo(appid);
@@ -32,7 +50,7 @@ public class CustomDestination
 
         if (rawBytes.Length <= 24)
         {
-            throw new Exception("Empty custom destinations jump list");
+            throw new JumpListParseException("Empty custom destinations jump list", 0, "File");
         }
 
         var footerSig = BitConverter.ToInt32(footerBytes, 0);
@@ -40,14 +58,17 @@ public class CustomDestination
 
         if (footerSig != fileSig)
         {
-            throw new Exception("Invalid signature (footer missing)");
+            throw new JumpListParseException("Invalid signature (footer missing)", rawBytes.Length - 4, "Footer");
         }
+
+        Version = BitConverter.ToInt32(rawBytes, 0);
+        NumberOfCategories = BitConverter.ToInt32(rawBytes, 4);
 
         Entries = new List<Entry>();
 
         var index = 0;
 
-        //first, check for footer offsets. some files have more than one
+        //first, check for footer offsets. some files have more than one (one per category)
 
         var footerOffsets = new List<int>();
 
@@ -65,10 +86,6 @@ public class CustomDestination
             index = lo + footerBytes.Length; //add length so we do not hit on it again
         }
 
-        var byteChunks = new List<byte[]>();
-
-        var absOffsets = new List<int>();
-
         var chunkStart = 0;
         foreach (var footerOffset in footerOffsets)
         {
@@ -77,23 +94,22 @@ public class CustomDestination
 
             Buffer.BlockCopy(rawBytes, chunkStart, bytes, 0, bytes.Length);
 
-            absOffsets.Add(chunkStart);
+            // The first chunk starts with the file header; later chunks start with their category
+            var categoryOffset = chunkStart == 0 ? FileHeaderSize : 0;
 
-            byteChunks.Add(bytes);
-
-            chunkStart += chunkSize;
-        }
-
-        var counter = 0;
-        foreach (var byteChunk in byteChunks)
-        {
-            if (byteChunk.Length > 30)
+            if (bytes.Length > 30)
             {
-                var e = new Entry(byteChunk, absOffsets[counter], codepage);
+                var e = new Entry(bytes, chunkStart, codepage, categoryOffset);
+
+                foreach (var parseError in e.ParseErrors)
+                {
+                    ParseErrors.Add($"Category at 0x{chunkStart:X}: {parseError}");
+                }
 
                 Entries.Add(e);
-                counter += 1;
             }
+
+            chunkStart += chunkSize;
         }
     }
 
@@ -101,7 +117,25 @@ public class CustomDestination
 
     public AppIdInfo AppId { get; }
 
+    /// <summary>
+    ///     Format version from the file header (2).
+    /// </summary>
+    public int Version { get; }
+
+    /// <summary>
+    ///     Number of categories from the file header.
+    /// </summary>
+    public int NumberOfCategories { get; }
+
+    /// <summary>
+    ///     One entry per category.
+    /// </summary>
     public List<Entry> Entries { get; }
+
+    /// <summary>
+    ///     Problems that didn't stop parsing, such as a LNK that couldn't be parsed.
+    /// </summary>
+    public List<string> ParseErrors { get; } = new List<string>();
 
     public override string ToString()
     {
@@ -130,6 +164,7 @@ public class CustomDestination
                 sb.AppendLine($"      Target modified: {lnkFile.Header.TargetModificationDate}");
                 sb.AppendLine($"      Target accessed: {lnkFile.Header.TargetLastAccessedDate}");
             }
+
             sb.AppendLine();
             entryNum += 1;
         }
@@ -165,6 +200,7 @@ public class CustomDestination
                                 break;
                             }
                         }
+
                         //everything matched up
                         if (matched)
                         {
@@ -181,6 +217,7 @@ public class CustomDestination
                 }
             }
         }
+
         return found;
     }
 }

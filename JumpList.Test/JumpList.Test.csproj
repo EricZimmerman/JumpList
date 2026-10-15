@@ -1,24 +1,19 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>10</LangVersion>
     <IsPackable>false</IsPackable>
+    <Copyright>Eric Zimmerman</Copyright>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="TestFiles\Win10\5f7b5f1e01b83767.automaticDestinations-ms" />
-    <None Include="TestFiles\Win10\7e4dca80246863e3.automaticDestinations-ms" />
-    <None Include="TestFiles\Win10\f01b4d95cf55d32a.automaticDestinations-ms" />
-    <None Include="TestFiles\Win7\1b4dd67f29cb1962.automaticDestinations-ms" />
-    <None Include="TestFiles\Win80\f01b4d95cf55d32a.automaticDestinations-ms" />
-    <None Include="TestFiles\Win81\f01b4d95cf55d32a.automaticDestinations-ms" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\JumpList\JumpList.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.5.1" />
-    <PackageReference Include="OleCf" Version="2026.5.0" />
     <PackageReference Include="FluentAssertions" Version="[7.0.0,8.0.0)" />
-    <PackageReference Include="NUnit" Version="4.6.0" />  
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="NUnit" Version="5.0.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="6.3.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../JumpList/JumpList.csproj" />
+    <!-- Real jump lists, one folder per OS version, plus dtformats samples and a non-OLE file in Bad -->
+    <None Include="TestFiles/**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

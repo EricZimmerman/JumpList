@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+  </Configurations>
+  <Project Path="JumpList.Test/JumpList.Test.csproj" />
+  <Project Path="JumpList/JumpList.csproj" />
+</Solution>

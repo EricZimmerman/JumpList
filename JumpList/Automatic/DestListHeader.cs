@@ -1,12 +1,26 @@
-﻿using System;
+using System;
 using System.Text;
 
 namespace JumpList.Automatic;
 
 public class DestListHeader
 {
+    public const int Size = 32;
+
+    /// <exception cref="JumpListParseException">rawBytes is shorter than 32 bytes</exception>
     public DestListHeader(byte[] rawBytes)
     {
+        if (rawBytes == null)
+        {
+            throw new ArgumentNullException(nameof(rawBytes));
+        }
+
+        if (rawBytes.Length < Size)
+        {
+            throw new JumpListParseException(
+                $"The DestList header is {Size} bytes, but only {rawBytes.Length} are available", 0, "DestList header");
+        }
+
         Version = BitConverter.ToInt32(rawBytes, 0);
         NumberOfEntries = BitConverter.ToInt32(rawBytes, 4);
         NumberOfPinnedEntries = BitConverter.ToInt32(rawBytes, 8);

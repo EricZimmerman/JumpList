@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using JumpList.Properties;
@@ -13,32 +13,32 @@ public class AppIdList
     public AppIdList()
     {
         Log.Debug("Loading AppIds...");
-        //load included
-        string[] stringSeparators = {"\r\n"};
+        //load included. Split on \n and let IterateLines trim \r, so this works whatever line endings the
+        //resource was built with
+        var lines = Resources.AppIDs.Split('\n');
 
-        var lines = Resources.AppIDs.Split(stringSeparators, StringSplitOptions.None);
-        
         _appIDs = new Dictionary<string, string>();    
        
         IterateLines(lines);
     }
 
+    /// <summary>
+    ///     Description of an AppId (case-insensitive), or "Unknown AppId"
+    /// </summary>
     public string GetDescriptionFromId(string id)
     {
-        var desc = "Unknown AppId";
-
-        var intId = id.ToLowerInvariant();
-
-        _appIDs.TryGetValue(intId, out desc);
-        
-        if (_appIDs.ContainsKey(intId))
+        if (id != null && _appIDs.TryGetValue(id.ToLowerInvariant(), out var desc))
         {
-            desc = _appIDs[id];
+            return desc;
         }
 
-
-        return desc;
+        return "Unknown AppId";
     }
+
+    /// <summary>
+    ///     Number of AppIds loaded
+    /// </summary>
+    public int Count => _appIDs.Count;
 
     private int IterateLines(IEnumerable<string> lines)
     {
