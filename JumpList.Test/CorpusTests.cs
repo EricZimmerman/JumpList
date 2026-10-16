@@ -10,7 +10,8 @@ namespace JumpList.Test;
 
 /// <summary>
 ///     Runs over a local collection of real jump lists that is not in the repository: the "Jump lists and lnks"
-///     folder next to the repository, or the folder in the JUMPLIST_CORPUS environment variable. Skipped when missing.
+///     folder in the Corpus folder next to the repository (or directly next to it), or the folder in the
+///     JUMPLIST_CORPUS environment variable. Skipped when missing.
 /// </summary>
 [TestFixture]
 public class CorpusTests
@@ -29,10 +30,16 @@ public class CorpusTests
         var dir = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
         while (dir != null)
         {
-            var candidate = Path.Combine(dir.FullName, "Jump lists and lnks");
-            if (Directory.Exists(candidate))
+            foreach (var candidate in new[]
+                     {
+                         Path.Combine(dir.FullName, "Corpus", "Jump lists and lnks"),
+                         Path.Combine(dir.FullName, "Jump lists and lnks")
+                     })
             {
-                return candidate;
+                if (Directory.Exists(candidate))
+                {
+                    return candidate;
+                }
             }
 
             dir = dir.Parent;
