@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-A `netstandard2.0` NuGet library that parses Windows jump lists. Its consumers are JLECmd and JumpListExplorer, so keep the public API compatible. It builds on sibling packages: OleCf (container), Lnk (LNK files), ExtensionBlocks (property stores, known folder names) and GuidMapping. Fixes to those formats belong in those repos, followed by a package bump here. Input may be corrupt or hostile.
+A `netstandard2.0` NuGet library that parses Windows jump lists. Its consumers are JLECmd and JumpListExplorer, so keep the public API compatible. It builds on sibling packages: OleCf (container), Lnk (LNK files; since Lnk 2026.10.6 their shell items are ExtensionBlocks' classes), ExtensionBlocks (shell items, property stores, known folder names) and GuidMapping. Fixes to those formats belong in those repos, followed by a package bump here. Input may be corrupt or hostile.
 
 ## Commands
 
