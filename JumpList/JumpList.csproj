@@ -19,9 +19,9 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ExtensionBlocks" Version="2026.10.0" />
+    <PackageReference Include="ExtensionBlocks" Version="2026.10.2" />
     <PackageReference Include="GuidMapping" Version="2026.10.1" />
-    <PackageReference Include="Lnk" Version="2026.10.4" />
+    <PackageReference Include="Lnk" Version="2026.10.5" />
     <PackageReference Include="OleCf" Version="2026.10.1" />
 
     <None Include="../README.md" Pack="true" PackagePath=""/>
