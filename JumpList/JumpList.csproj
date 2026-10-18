@@ -21,7 +21,7 @@
   <ItemGroup>
     <PackageReference Include="ExtensionBlocks" Version="2026.10.5" />
     <PackageReference Include="GuidMapping" Version="2026.10.1" />
-    <PackageReference Include="Lnk" Version="2026.10.6" />
+    <PackageReference Include="Lnk" Version="2026.10.7" />
     <PackageReference Include="OleCf" Version="2026.10.1" />
 
     <None Include="../README.md" Pack="true" PackagePath=""/>
