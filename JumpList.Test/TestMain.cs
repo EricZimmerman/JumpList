@@ -100,6 +100,47 @@ public class TestMain
     }
 
     [Test]
+    public void StreamsDoNotNeedTheFileBytesAfterLoading()
+    {
+        // The OLE container (the whole file, and a copy of its mini stream) is not kept: the exported LNKs and
+        // GetLnkFromDirectoryName come from the streams read while parsing, even if the caller's array changes
+        var path = Sample("Win10", "f01b4d95cf55d32a.automaticDestinations-ms");
+        var data = File.ReadAllBytes(path);
+        var ole = new OleCfFile(File.ReadAllBytes(path), path);
+        var a = new AutomaticDestination(data, path);
+        Array.Clear(data, 0, data.Length);
+
+        var lnkStreams = ole.Directory.Where(t => t.DirectoryType == DirectoryEntry.DirectoryEntryTypes.Stream &&
+                                                  t.DirectoryName != "DestList").ToList();
+        lnkStreams.Should().HaveCount(9);
+        foreach (var stream in lnkStreams)
+        {
+            a.GetLnkFromDirectoryName(stream.DirectoryName).RawBytes.Should().Equal(ole.GetPayloadForDirectory(stream));
+        }
+
+        var dir = Path.Combine(Path.GetTempPath(), "jl-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            a.DumpAllLnkFiles(dir);
+            foreach (var stream in lnkStreams)
+            {
+                File.ReadAllBytes(Path.Combine(dir, $"AppId_f01b4d95cf55d32a_DirName_{stream.DirectoryName}.lnk"))
+                    .Should().Equal(ole.GetPayloadForDirectory(stream));
+            }
+
+            Directory.GetFiles(dir).Should().HaveCount(9);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+
+        // The root entry's payload is the mini stream, not an LNK
+        a.GetLnkFromDirectoryName("Root Entry").Should().BeNull();
+        a.GetLnkFromDirectoryName("NoSuchStream").Should().BeNull();
+    }
+
+    [Test]
     public void CustomDestinationSample()
     {
         var c = JumpList.LoadCustomJumplist(Sample("dtformats", "5afe4de1b92fc382.customDestinations-ms"));

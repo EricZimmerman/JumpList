@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using ExtensionBlocks;
 using Lnk;
@@ -12,7 +13,13 @@ namespace JumpList.Automatic;
 public class AutomaticDestination
 {
     private readonly int _codepage;
-    private readonly OleCfFile _oleContainer;
+
+    // Each directory entry's stream, read once while parsing; the OLE container is not kept, since it holds the whole
+    // file and a copy of its mini stream (135 MB for a 106 MB set of jump lists). An LNK stream's array is the one its
+    // LnkFile.RawBytes holds, so this costs only the DestList and DestListPropertyStore. A stream that could not be
+    // read keeps its exception, rethrown by GetLnkFromDirectoryName as before
+    private readonly Dictionary<DirectoryEntry, byte[]> _streams = new Dictionary<DirectoryEntry, byte[]>();
+    private readonly Dictionary<DirectoryEntry, ExceptionDispatchInfo> _streamErrors = new Dictionary<DirectoryEntry, ExceptionDispatchInfo>();
 
     /// <summary>
     ///     Parses an automatic destinations jump list. A damaged DestList, property store or LNK stream is reported in
@@ -46,18 +53,31 @@ public class AutomaticDestination
             AppId = new AppIdInfo("Unable to determine AppId");
         }
 
-        _oleContainer = new OleCfFile(rawBytes, sourceFile);
+        var oleContainer = new OleCfFile(rawBytes, sourceFile);
 
-        Directory = _oleContainer.Directory;
-        ParseErrors.AddRange(_oleContainer.ParseErrors.Select(t => $"OLE container: {t}"));
+        Directory = oleContainer.Directory;
+        ParseErrors.AddRange(oleContainer.ParseErrors.Select(t => $"OLE container: {t}"));
+
+        // (the root entry's payload is the mini stream itself: not a stream of the jump list)
+        foreach (var dirItem in Directory.Where(t => t.DirectoryType != DirectoryEntry.DirectoryEntryTypes.RootStorage))
+        {
+            try
+            {
+                _streams[dirItem] = oleContainer.GetPayloadForDirectory(dirItem);
+            }
+            catch (Exception ex)
+            {
+                _streamErrors[dirItem] = ExceptionDispatchInfo.Capture(ex);
+            }
+        }
 
         var destList =
-            _oleContainer.Directory.FirstOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
+            Directory.FirstOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
         if (destList != null && destList.DirectorySize > 0)
         {
             try
             {
-                var destBytes = _oleContainer.GetPayloadForDirectory(destList);
+                var destBytes = GetStream(destList);
 
                 if (destBytes != null)
                 {
@@ -72,12 +92,12 @@ public class AutomaticDestination
         }
 
         var destListPropertyStore =
-            _oleContainer.Directory.FirstOrDefault(t => t.DirectoryName == "DestListPropertyStore");
+            Directory.FirstOrDefault(t => t.DirectoryName == "DestListPropertyStore");
         if (destListPropertyStore != null && destListPropertyStore.DirectorySize > 0)
         {
             try
             {
-                var destListPropertyStoreBytes = _oleContainer.GetPayloadForDirectory(destListPropertyStore);
+                var destListPropertyStoreBytes = GetStream(destListPropertyStore);
 
                 EmptyDestListPropertyStore = true;
 
@@ -107,7 +127,7 @@ public class AutomaticDestination
             {
                 // The stream for an entry is named with its number in hex
                 var dirItem =
-                    _oleContainer.Directory.FirstOrDefault(
+                    Directory.FirstOrDefault(
                         t =>
                             string.Equals(t.DirectoryName, entry.EntryNumber.ToString("X"),
                                 StringComparison.InvariantCultureIgnoreCase));
@@ -141,7 +161,7 @@ public class AutomaticDestination
 
         try
         {
-            var p = _oleContainer.GetPayloadForDirectory(dirItem);
+            var p = GetStream(dirItem);
 
             if (p == null || p.Length == 0)
             {
@@ -156,6 +176,19 @@ public class AutomaticDestination
             ParseErrors.Add($"Stream {dirItem.DirectoryName}: unable to parse LNK: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    ///     A stream's bytes as the OLE container gave them while parsing (the same array each time), or its exception
+    /// </summary>
+    private byte[] GetStream(DirectoryEntry dirItem)
+    {
+        if (_streamErrors.TryGetValue(dirItem, out var error))
+        {
+            error.Throw();
+        }
+
+        return _streams.TryGetValue(dirItem, out var bytes) ? bytes : null;
     }
 
     public List<DirectoryEntry> Directory { get; }
@@ -180,21 +213,23 @@ public class AutomaticDestination
     public List<AutoDestList> DestListEntries { get; }
 
     /// <summary>
-    ///     Parses the LNK in a stream, using the codepage the jump list was loaded with
+    ///     Parses the LNK in a stream, using the codepage the jump list was loaded with. Null when there is no such
+    ///     stream, and for the root entry (its payload is the mini stream, which held every small stream; parsed as an
+    ///     LNK, that gave the first one with junk after it)
     /// </summary>
     public LnkFile GetLnkFromDirectoryName(string dirName)
     {
         var dirItem =
-            _oleContainer.Directory.FirstOrDefault(
+            Directory.FirstOrDefault(
                 t =>
                     string.Equals(t.DirectoryName, dirName,
                         StringComparison.InvariantCultureIgnoreCase));
 
-        if (dirItem != null)
+        if (dirItem != null && dirItem.DirectoryType != DirectoryEntry.DirectoryEntryTypes.RootStorage)
         {
             var sfn = $"{SourceFile}_Directory name_{dirItem.DirectoryName:X}";
 
-            var p = _oleContainer.GetPayloadForDirectory(dirItem);
+            var p = GetStream(dirItem);
 
             var dlnk = new LnkFile(p, sfn, _codepage);
 
@@ -267,7 +302,7 @@ public class AutomaticDestination
             System.IO.Directory.CreateDirectory(outDir);
         }
 
-        foreach (var directoryItem in _oleContainer.Directory)
+        foreach (var directoryItem in Directory)
         {
             if (directoryItem.DirectoryName.ToLowerInvariant() == "root entry" ||
                 directoryItem.DirectoryName.ToLowerInvariant() == "destlist")
@@ -283,7 +318,7 @@ public class AutomaticDestination
             byte[] lnkBytes;
             try
             {
-                lnkBytes = _oleContainer.GetPayloadForDirectory(directoryItem);
+                lnkBytes = GetStream(directoryItem);
             }
             catch (OleCfParseException)
             {
