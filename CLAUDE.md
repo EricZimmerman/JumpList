@@ -45,6 +45,7 @@ Right after a dependency is published, `dotnet restore --no-http-cache` may be n
 ## Versioning and release
 
 - MinVer sets the version from the git tag (bare tags like `2026.10.0`); there is no `<Version>` in the csproj.
+- `Directory.Build.props`: pdbs are embedded in the assemblies (`DebugType` embedded, `EmbedUntrackedSources`) and Release builds set `ContinuousIntegrationBuild` (source paths `/_/...`, not this machine's), so stack traces (Exceptionless) have file and line numbers and no .pdb file ships; the nupkg's dll carries the pdb, so there is no .snupkg. Don't add `DebugType`, `IncludeSymbols` or `SymbolPackageFormat` to project files.
 - To release: push to `master`, then `git tag <ver> && git push origin <ver> && gh release create <ver> --verify-tag --generate-notes`.
 - `.github/workflows/publish.yml` (identical to GuidMapping's) packs, validates and tests on PRs and pushes to `master`. When a GitHub Release is published, it pushes to NuGet.org using trusted publishing (`NuGet/login` with the `NUGET_USER` repo variable).
 - Dependabot (`.github/dependabot.yml`) opens monthly PRs for GitHub Actions and NuGet updates.
