@@ -6,7 +6,7 @@
     <Company>Eric Zimmerman</Company>
     <Product>Jumplist parser</Product>
     <Description>Parses Windows jumplists (automatic and custom destinations)</Description>
-    <Copyright>Eric Zimmerman</Copyright>
+    <Copyright>Eric R. Zimmerman 2027</Copyright>
     <PackageProjectUrl>https://github.com/EricZimmerman/JumpList</PackageProjectUrl>
     <RepositoryUrl>https://github.com/EricZimmerman/JumpList</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
